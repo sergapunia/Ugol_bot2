@@ -10,10 +10,12 @@ import random
 from binance import Client, ThreadedWebsocketManager, ThreadedDepthCacheManager
 from binance.client import Client
 from futures_sign import send_signed_request, send_public_request
-from cred import KEY, SECRET
 
 #bot_token='5653486266:AAEXoa-iM1pAY5N9eDEwbXJ6-aLGCyEgR5k' # вставьте токен из бота @BotFather
 #chat_id='624736798' # вставьте id из бота @getmyid_bot
+
+KEY = '6ba95e7ed67fff7357a6a9fdca47e350852a2d62668d1db9570e5ae9db99e9c3'
+SECRET = '793aebcbcff748c0350cd24979964541e28cbe8491e2005853c52bec0cd4473f'
 
 symbol = 'ETHUSDT'
 client = Client(KEY,SECRET,tld='https://testnet.binancefuture.com',testnet=True)
