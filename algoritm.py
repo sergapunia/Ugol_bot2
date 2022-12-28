@@ -2,14 +2,15 @@ import requests
 import numpy as np
 import pandas as pd
 import statsmodels.api as sm
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 import copy
 import time
 import random
 
+
 from binance import Client, ThreadedWebsocketManager, ThreadedDepthCacheManager
 from binance.client import Client
-from futures_sign import send_signed_request, send_public_request
+#from futures_sign import send_signed_request, send_public_request
 
 #bot_token='5653486266:AAEXoa-iM1pAY5N9eDEwbXJ6-aLGCyEgR5k' # вставьте токен из бота @BotFather
 #chat_id='624736798' # вставьте id из бота @getmyid_bot
@@ -20,9 +21,9 @@ SECRET = '793aebcbcff748c0350cd24979964541e28cbe8491e2005853c52bec0cd4473f'
 symbol = 'ETHUSDT'
 client = Client(KEY,SECRET,tld='https://testnet.binancefuture.com',testnet=True)
 
-maxposition = 1 # количество монет для торговли,учитывая плечи
+maxposition = 0.01 # количество монет для торговли,учитывая плечи
 stop_percent = 0.01  # 0.01=1% # процент потери для стопа торговли,учитывая плечи
-eth_proffit_array = [[20, 1], [40, 1], [60, 2], [80, 2], [100, 2], [150, 1], [200, 1], [200, 0]] #массив контрактов.проходя пункты постепенно закрывает позицию
+eth_proffit_array = [[1, 4], [1.5, 3.5], [2, 1.5], [3, 1], [80, 2], [150, 1], [200, 1], [200, 0]] #массив контрактов.проходя пункты постепенно закрывает позицию
 proffit_array = copy.copy(eth_proffit_array)
 
 pointer = str(random.randint(1000, 9999))  #при запуске бота с сервера и с пк,будет понятно где какой бот открывает сделки
@@ -31,7 +32,7 @@ pointer = str(random.randint(1000, 9999))  #при запуске бота с с
 # Get last 500 kandels 5 minutes for Symbol
 
 def get_futures_klines(symbol, limit=500):
-    x = requests.get('https://binance.com/fapi/v1/klines?symbol=' + symbol + '&limit=' + str(limit) + '&interval=1m')
+    x = requests.get('https://binance.com/fapi/v1/klines?symbol=' + symbol + '&limit=' + str(limit) + '&interval=5m')
     df = pd.DataFrame(x.json())
     df.columns = ['open_time', 'open', 'high', 'low', 'close', 'volume', 'close_time', 'd1', 'd2', 'd3', 'd4', 'd5']
     df = df.drop(['d1', 'd2', 'd3', 'd4', 'd5'], axis=1)
@@ -232,17 +233,17 @@ def check_if_signal(symbol):
 
     if isLCC(prepared_df, i - 1) > 0: #i-1 берём 97-ю свечу
         # found bottom - OPEN LONG
-        if prepared_df['position_in_channel'][i - 1] < 0.5: #локальный минимум
+        if prepared_df['position_in_channel'][i - 1] < 0.3: #локальный минимум
             # close to top of channel
-            if prepared_df['slope'][i - 1] < -20: #если уровень достаточно низкий то в лонг
+            if prepared_df['slope'][i - 1] < -8: #если уровень достаточно низкий то в лонг
                 # found a good enter point for LONG
                 signal = 'long'
 
     if isHCC(prepared_df, i - 1) > 0: #локальный максимум
         # found top - OPEN SHORT
-        if prepared_df['position_in_channel'][i - 1] > 0.5:
+        if prepared_df['position_in_channel'][i - 1] > 0.3:
             # close to top of channel
-            if prepared_df['slope'][i - 1] > 20: #если уровень достаточно высокий то в шорт
+            if prepared_df['slope'][i - 1] > 8: #если уровень достаточно высокий то в шорт
                 # found a good enter point for SHORT
                 signal = 'short'
 
@@ -363,7 +364,7 @@ if __name__ == '__main__':
             counterr = counterr + 1
             if counterr > 5:
                 counterr = 1
-            time.sleep(30 - ((time.time() - starttime) % 30.0))  # время повторения запроса(10 секунд,можно минуту)
+            time.sleep(10 - ((time.time() - starttime) % 10.0))  # время повторения запроса(10 секунд,можно минуту)
         except KeyboardInterrupt:
             print('\n\KeyboardInterrupt. Stopping.')
             exit()

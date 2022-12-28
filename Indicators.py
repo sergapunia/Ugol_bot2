@@ -183,9 +183,9 @@ for i in range(4, lend - 1):
         if prepared_df['lcc'][i - 1] != None:
             # found bottom - OPEN LONG
             if prepared_df['position_in_channel'][
-                i - 1] < 0.5:  # близость прижатия к каналу.можно поменять и сделать ближе(0.2)
+                i - 1] < 0.2:  # близость прижатия к каналу.можно поменять и сделать ближе(0.2)
                 # close to top of channel
-                if prepared_df['slope'][i - 1] < -20:  # уровень наклона -меньше для боковиков
+                if prepared_df['slope'][i - 1] < -5:  # уровень наклона -меньше для боковиков
                     # found a good enter point
                     if position == 0:
                         proffit_array = copy.copy(eth_proffit_array)
@@ -195,9 +195,9 @@ for i in range(4, lend - 1):
                         prepared_df.at[i, 'deal_o'] = prepared_df['close'][i]
         if prepared_df['hcc'][i - 1] != None:
             # found top - OPEN SHORT
-            if prepared_df['position_in_channel'][i - 1] > 0.5:  # близость прижатия к каналу
+            if prepared_df['position_in_channel'][i - 1] > 0.2:  # близость прижатия к каналу
                 # close to top of channel
-                if prepared_df['slope'][i - 1] > 20:  # уровень наклона
+                if prepared_df['slope'][i - 1] > 5:  # уровень наклона
                     # found a good enter point
                     if position == 0:
                         proffit_array = copy.copy(eth_proffit_array)
@@ -247,4 +247,4 @@ def graphic():
     ax3.grid(True)
 
     plt.show()
-# print(graphic())
+#print(graphic())
