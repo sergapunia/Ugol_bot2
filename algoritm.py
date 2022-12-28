@@ -2,31 +2,37 @@ import requests
 import numpy as np
 import pandas as pd
 import statsmodels.api as sm
-#import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 import copy
 import time
 import random
 
+from aiogram import Bot, Dispatcher, executor, types
 
 from binance import Client, ThreadedWebsocketManager, ThreadedDepthCacheManager
 from binance.client import Client
-#from futures_sign import send_signed_request, send_public_request
 
-#bot_token='5653486266:AAEXoa-iM1pAY5N9eDEwbXJ6-aLGCyEgR5k' # вставьте токен из бота @BotFather
-#chat_id='624736798' # вставьте id из бота @getmyid_bot
+# from futures_sign import send_signed_request, send_public_request
+
+TOKEN = '5653486266:AAEXoa-iM1pAY5N9eDEwbXJ6-aLGCyEgR5k'
+CHAT = '624736798'
+bot = Bot(TOKEN)
+dp = Dispatcher(bot)
 
 KEY = '6ba95e7ed67fff7357a6a9fdca47e350852a2d62668d1db9570e5ae9db99e9c3'
 SECRET = '793aebcbcff748c0350cd24979964541e28cbe8491e2005853c52bec0cd4473f'
 
 symbol = 'ETHUSDT'
-client = Client(KEY,SECRET,tld='https://testnet.binancefuture.com',testnet=True)
+client = Client(KEY, SECRET, tld='https://testnet.binancefuture.com', testnet=True)
 
-maxposition = 0.01 # количество монет для торговли,учитывая плечи
+maxposition = 1  # количество монет для торговли,учитывая плечи
 stop_percent = 0.01  # 0.01=1% # процент потери для стопа торговли,учитывая плечи
-eth_proffit_array = [[1, 4], [1.5, 3.5], [2, 1.5], [3, 1], [80, 2], [150, 1], [200, 1], [200, 0]] #массив контрактов.проходя пункты постепенно закрывает позицию
+eth_proffit_array = [[1, 4], [1.5, 3.5], [2, 1.5], [3, 1], [80, 2], [150, 1], [200, 1],
+                     [200, 0]]  # массив контрактов.проходя пункты постепенно закрывает позицию
 proffit_array = copy.copy(eth_proffit_array)
 
-pointer = str(random.randint(1000, 9999))  #при запуске бота с сервера и с пк,будет понятно где какой бот открывает сделки
+pointer = str(
+    random.randint(1000, 9999))  # при запуске бота с сервера и с пк,будет понятно где какой бот открывает сделки
 
 
 # Get last 500 kandels 5 minutes for Symbol
@@ -145,7 +151,7 @@ def get_symbol_price(symbol):
 
 # INDICATORS
 # To find a slope of price line
-def indSlope(series, n): #определяет угол наклона
+def indSlope(series, n):  # определяет угол наклона
     array_sl = [j * 0 for j in range(n - 1)]
 
     for j in range(n, len(series) + 1):
@@ -163,7 +169,7 @@ def indSlope(series, n): #определяет угол наклона
 
 # True Range and Average True Range indicator
 
-def indATR(source_DF, n): #истинный дневной диапазон
+def indATR(source_DF, n):  # истинный дневной диапазон
     df = source_DF.copy()
     df['H-L'] = abs(df['high'] - df['low'])
     df['H-PC'] = abs(df['high'] - df['close'].shift(1))
@@ -197,7 +203,7 @@ def isHCC(DF, i):
     return HCC
 
 
-def getMaxMinChannel(DF, n): #верхний и нижний уровень канала
+def getMaxMinChannel(DF, n):  # верхний и нижний уровень канала
     maxx = 0
     minn = DF['low'].max()
     for i in range(1, n):
@@ -225,77 +231,93 @@ def PrepareDF(DF):
 
 
 def check_if_signal(symbol):
-    ohlc = get_futures_klines(symbol, 100) #берём 100 последних свечей
+    ohlc = get_futures_klines(symbol, 100)  # берём 100 последних свечей
     prepared_df = PrepareDF(ohlc)
     signal = ""  # return value
 
-    i = 98  #99 свеча не сформирована,берём 98 99 is current kandel which is not closed, 98 is last closed candel, we need 97 to check if it is bottom or top
+    i = 98  # 99 свеча не сформирована,берём 98 99 is current kandel which is not closed, 98 is last closed candel, we need 97 to check if it is bottom or top
 
-    if isLCC(prepared_df, i - 1) > 0: #i-1 берём 97-ю свечу
+    if isLCC(prepared_df, i - 1) > 0:  # i-1 берём 97-ю свечу
         # found bottom - OPEN LONG
-        if prepared_df['position_in_channel'][i - 1] < 0.3: #локальный минимум
+        if prepared_df['position_in_channel'][i - 1] < 0.3:  # локальный минимум
             # close to top of channel
-            if prepared_df['slope'][i - 1] < -8: #если уровень достаточно низкий то в лонг
+            if prepared_df['slope'][i - 1] < -8:  # если уровень достаточно низкий то в лонг
                 # found a good enter point for LONG
                 signal = 'long'
 
-    if isHCC(prepared_df, i - 1) > 0: #локальный максимум
+    if isHCC(prepared_df, i - 1) > 0:  # локальный максимум
         # found top - OPEN SHORT
         if prepared_df['position_in_channel'][i - 1] > 0.3:
             # close to top of channel
-            if prepared_df['slope'][i - 1] > 8: #если уровень достаточно высокий то в шорт
+            if prepared_df['slope'][i - 1] > 8:  # если уровень достаточно высокий то в шорт
                 # found a good enter point for SHORT
                 signal = 'short'
 
     return signal
 
-# telegram_delay=8
-#
-# def getTPSLfrom_telegram():
-#     strr='https://api.telegram.org/bot'+bot_token+'/getUpdates'
-#     response = requests.get(strr)
-#     rs=response.json()
-#     rs2=rs['result'][-1]
-#     rs3=rs2['message']
-#     textt=rs3['text']
-#     datet=rs3['date']
-#
-#     if(time.time()-datet)<telegram_delay:
-#         if 'quit' in textt:
-#             quit()
-#         if 'exit' in textt:
-#             exit()
-#         if 'hello' in textt:
-#             telegram_bot_sendtext('Hello. How are you?')
-#         if 'close_pos' in textt:
-#             position = get_opened_positions(symbol)
-#             open_sl = position[0]
-#             quantity = position[1]
-#             #  print(open_sl,quantity)
-#             close_position(symbol, open_sl, abs(quantity))
-#
-# def telegram_bot_sendtext(bot_message):
-#     bot_token2 = bot_token
-#     bot_chatID = chat_id
-#     send_text = 'https://api.telegram.org/bot' + bot_token2 + '/sendMessage?chat_id=' + bot_chatID + '&parse_mode=Markdown&text=' + bot_message
-#     response = requests.get(send_text)
-#     return response.json()
+
+# tg bot
+telegram_delay = 12
+
+
+def getTPSLfrom_telegram():
+    strr = 'https://api.telegram.org/bot' + TOKEN + '/getUpdates'
+    response = requests.get(strr)
+    rs = response.json()
+    if (len(rs['result']) > 0):
+        rs2 = rs['result'][-1]
+        rs3 = rs2['message']
+        textt = rs3['text']
+        datet = rs3['date']
+
+        if (time.time() - datet) < telegram_delay:
+            if 'quit' in textt:
+                quit()
+            if 'exit' in textt:
+                exit()
+            if 'hello' in textt:
+                telegram_bot_sendtext('Hello. How are you?')
+            if 'close_pos' in textt:
+                position = get_opened_positions(symbol)
+                open_sl = position[0]
+                quantity = position[1]
+                #  print(open_sl,quantity)
+                close_position(symbol, open_sl, abs(quantity))
+
+
+def telegram_bot_sendtext(bot_message):
+    bot_token2 = TOKEN
+    bot_chatID = CHAT
+    send_text = 'https://api.telegram.org/bot' + bot_token2 + '/sendMessage?chat_id=' + bot_chatID + '&parse_mode=Markdown&text=' + bot_message
+    response = requests.get(send_text)
+    return response.json()
 
 
 def prt(message):
     # для телеграмма
-    #telegram_bot_sendtext(pointer + ': ' + message)
+    telegram_bot_sendtext(pointer + ': ' + message)
     print(pointer + ': ' + message)
+
+
+flag = 0
+flag2 = 0
 
 
 def main(step):
     global proffit_array
-
+    global flag
+    global flag2
     try:
         position = get_opened_positions(symbol)
         open_sl = position[0]
         if open_sl == "":  # no position
-            prt('Нет открытых позиций')
+            flag += 1
+            flag2 = 0
+            print("script continue running at " + time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time())))
+            print('Нет открытых позиций')
+            if flag == 1:
+                prt("script continue running at " + time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time())))
+                prt('Нет открытых позиций')
             # close all stop loss orders
             check_and_close_orders(symbol)
             signal = check_if_signal(symbol)
@@ -307,19 +329,25 @@ def main(step):
             elif signal == 'short':
                 open_position(symbol, 'short', maxposition)
         else:
+            flag = 0
+            flag2 += 1
 
             entry_price = position[5]  # enter price
             current_price = get_symbol_price(symbol)
             quantity = position[1]
-
-            prt('Найдена открытая позиция ' + open_sl)
-            prt('Кол-во: ' + str(quantity))
+            print("script continue running at " + time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time())))
+            print('Найдена открытая позиция ' + open_sl + ' ' + symbol)
+            print('Кол-во: ' + str(quantity))
+            if flag2 == 1:
+                prt("script continue running at " + time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time())))
+                prt('Найдена открытая позиция ' + open_sl + ' ' + symbol)
+                prt('Кол-во: ' + str(quantity))
 
             if open_sl == 'long':
                 stop_price = entry_price * (1 - stop_percent)
                 if current_price < stop_price:
                     # stop loss
-                    close_position(symbol, 'long', abs(quantity)) #закрыть если цена достигла стоп-лосса
+                    close_position(symbol, 'long', abs(quantity))  # закрыть если цена достигла стоп-лосса
                     proffit_array = copy.copy(eth_proffit_array)
                 else:
                     temp_arr = copy.copy(proffit_array)
@@ -328,7 +356,8 @@ def main(step):
                         contracts = temp_arr[j][1]
                         if (current_price > (entry_price + delta)):
                             # take profit
-                            close_position(symbol, 'long', abs(round(maxposition * (contracts / 10), 3)))#зарыть контракты из массива
+                            close_position(symbol, 'long',
+                                           abs(round(maxposition * (contracts / 10), 3)))  # зарыть контракты из массива
                             del proffit_array[0]
 
             if open_sl == 'short':
@@ -348,6 +377,7 @@ def main(step):
                             del proffit_array[0]
 
     except:
+        prt("script continue running at " + time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time())))
         prt('\n\nУпс,что-то пошло не так.Пробуем снова...')
 
 
@@ -357,15 +387,14 @@ counterr = 1
 
 if __name__ == '__main__':
 
-    while True : #time.time() <= timeout:
+    while True:  # time.time() <= timeout:
         try:
-            prt("script continue running at " + time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time())))
+            # prt("script continue running at " + time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time())))
             main(counterr)
-            counterr = counterr + 1
             if counterr > 5:
                 counterr = 1
-            time.sleep(10 - ((time.time() - starttime) % 10.0))  # время повторения запроса(10 секунд,можно минуту)
+            time.sleep(3 - ((time.time() - starttime) % 3.0))  # время повторения запроса(10 секунд,можно минуту)
         except KeyboardInterrupt:
+            prt("script continue running at " + time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time())))
             print('\n\KeyboardInterrupt. Stopping.')
             exit()
-
