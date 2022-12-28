@@ -1,40 +1,42 @@
-from binance.spot import Spot
+import requests
 import pandas as pd
 from pandas import DataFrame
 import datetime
 import numpy as np
 import matplotlib.pyplot as plt
 import statsmodels.api as sm
+#from aiogram import Bot, Dispatcher, executor, types
 import copy
+from binance import Client, ThreadedWebsocketManager, ThreadedDepthCacheManager
+from binance.client import Client
+
+# TOKEN = '5653486266:AAEXoa-iM1pAY5N9eDEwbXJ6-aLGCyEgR5k'
+# CHAT = '624736798'
 
 pd.set_option('display.max_columns', 500)  # приводим в порядок отображение колонок 1-отобразить все колонки
 pd.set_option('display.max_rows', 500)  # 2 - ряды
 pd.set_option('display.width', 1000)  # 3-ширина
-
-api_key = 'L41IDD7sjzsoCOzkboH6EPL4PThTLIUEwHvpFq4rhb8IZ5coCQs3yv1NCXjJrkiL'
-sicret_key = 'hrUpyoWaLiQwLlMjmJwQta0PHKZz5qTAXUj1GusS1rLTFbhvkFhLYg4cq2qJVe0u'
-
-client = Spot(key=api_key, secret=sicret_key, base_url="https://testnet.binance.vision")
+# bot = Bot(TOKEN)
+# dp = Dispatcher(bot)
 
 
-def candals(symbol, timeframe, limit):  # функция исторических свеч
-    df = pd.DataFrame(client.klines(symbol=symbol, limit=limit, interval=timeframe))
-    m = pd.DataFrame()
-    m['date'] = df.iloc[:, 0]
-    m['date'] = pd.to_datetime(m['date'], unit='ms')
-    m['open'] = df.iloc[:, 1].astype(float)
-    m['high'] = df.iloc[:, 2].astype(float)
-    m['low'] = df.iloc[:, 3].astype(float)
-    m['close'] = df.iloc[:, 4].astype(float)
-    # m['ohlc4'] = (m['open'] + m['high'] + m['low'] + m['close'])/4
-    m['volume_coin'] = df.iloc[:, 5].astype(float)
-    m['volume_usdt'] = df.iloc[:, 7].astype(float)
-    # m['trades'] = m['volume_usdt'] / df.iloc[:, 8].astype(int)
-    # m['rsi'] = ta.rsi(m['close'], length=10)
-    # m['volume_market_coin'] = df.iloc[:, 9].astype(float)
-    # m['volume_market_usdt'] = df.iloc[:, 10].astype(float)
-    m = m.dropna()
-    return m
+KEY = 'L41IDD7sjzsoCOzkboH6EPL4PThTLIUEwHvpFq4rhb8IZ5coCQs3yv1NCXjJrkiL'
+SECRET = 'hrUpyoWaLiQwLlMjmJwQta0PHKZz5qTAXUj1GusS1rLTFbhvkFhLYg4cq2qJVe0u'
+
+#client = Spot(key=api_key, secret=sicret_key, base_url="https://testnet.binance.vision")
+client = Client(KEY, SECRET, tld='https://testnet.binancefuture.com', testnet=True)
+
+def candals(symbol,interval, limit=500):
+    x = requests.get('https://binance.com/fapi/v1/klines?symbol=' + symbol + '&limit=' + str(limit) + '&interval='+ str(interval))
+    df = pd.DataFrame(x.json())
+    df.columns = ['open_time', 'open', 'high', 'low', 'close', 'volume', 'close_time', 'd1', 'd2', 'd3', 'd4', 'd5']
+    df = df.drop(['d1', 'd2', 'd3', 'd4', 'd5'], axis=1)
+    df['open'] = df['open'].astype(float)
+    df['high'] = df['high'].astype(float)
+    df['low'] = df['low'].astype(float)
+    df['close'] = df['close'].astype(float)
+    df['volume'] = df['volume'].astype(float)
+    return (df)
 
 
 # print(DataFrame(candals('BTCUSDT', '5m', 30)))
@@ -115,7 +117,7 @@ def getMaxMinChannel(DF, n):  # ыерхний и нижний уровень к
     return (maxx, minn)
 
 
-df = DataFrame(candals('XRPUSDT', '15m', 500))
+df = DataFrame(candals('ETHUSDT', '5m', 500)) #=============================================================
 df = df[::-1]  # можно убрать
 prepared_df = PrepareDF(df)
 lend = len(prepared_df)
@@ -183,9 +185,9 @@ for i in range(4, lend - 1):
         if prepared_df['lcc'][i - 1] != None:
             # found bottom - OPEN LONG
             if prepared_df['position_in_channel'][
-                i - 1] < 0.2:  # близость прижатия к каналу.можно поменять и сделать ближе(0.2)
+                i - 1] < 0.4:  # близость прижатия к каналу.можно поменять и сделать ближе(0.2)
                 # close to top of channel
-                if prepared_df['slope'][i - 1] < -5:  # уровень наклона -меньше для боковиков
+                if prepared_df['slope'][i - 1] < -10:  # уровень наклона -меньше для боковиков
                     # found a good enter point
                     if position == 0:
                         proffit_array = copy.copy(eth_proffit_array)
@@ -195,9 +197,9 @@ for i in range(4, lend - 1):
                         prepared_df.at[i, 'deal_o'] = prepared_df['close'][i]
         if prepared_df['hcc'][i - 1] != None:
             # found top - OPEN SHORT
-            if prepared_df['position_in_channel'][i - 1] > 0.2:  # близость прижатия к каналу
+            if prepared_df['position_in_channel'][i - 1] > 0.4:  # близость прижатия к каналу
                 # close to top of channel
-                if prepared_df['slope'][i - 1] > 5:  # уровень наклона
+                if prepared_df['slope'][i - 1] > 10:  # уровень наклона
                     # found a good enter point
                     if position == 0:
                         proffit_array = copy.copy(eth_proffit_array)
