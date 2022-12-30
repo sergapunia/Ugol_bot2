@@ -21,10 +21,9 @@ SECRET = '793aebcbcff748c0350cd24979964541e28cbe8491e2005853c52bec0cd4473f'
 symbol = 'ETHUSDT'
 client = Client(KEY, SECRET, tld='https://testnet.binancefuture.com', testnet=True)
 
-maxposition = 1  # количество монет для торговли,учитывая плечи
+maxposition = 2  # количество монет для торговли,учитывая плечи
 stop_percent = 0.0004  # 0.01=1% # процент потери для стопа торговли,учитывая плечи,с 40-м плечём 0.0002=примерно 1.2%
-eth_proffit_array = [[0.9, 4], [1.5, 3.5], [2, 1.5], [3, 1], [80, 2], [150, 1], [200, 1],
-                     [200, 0]]  # массив контрактов.проходя пункты постепенно закрывает позицию
+eth_proffit_array =[[2.2, 5], [3, 2.5], [4, 2.5], [7, 1], [80, 2], [150, 1], [200, 1],[200, 0]]#[[0.9, 5], [1.5, 3.5], [2, 1.5], [3.5, 1], [80, 2], [150, 1], [200, 1],[200, 0]]   # массив контрактов.проходя пункты постепенно закрывает позицию
 proffit_array = copy.copy(eth_proffit_array)
 
 pointer = str(
@@ -34,7 +33,7 @@ pointer = str(
 # Get last 500 kandels 5 minutes for Symbol
 
 def get_futures_klines(symbol, limit=500):
-    x = requests.get('https://binance.com/fapi/v1/klines?symbol=' + symbol + '&limit=' + str(limit) + '&interval=5m')
+    x = requests.get('https://binance.com/fapi/v1/klines?symbol=' + symbol + '&limit=' + str(limit) + '&interval=1d') #===================СВЕЧА=======================
     df = pd.DataFrame(x.json())
     df.columns = ['open_time', 'open', 'high', 'low', 'close', 'volume', 'close_time', 'd1', 'd2', 'd3', 'd4', 'd5']
     df = df.drop(['d1', 'd2', 'd3', 'd4', 'd5'], axis=1)
@@ -130,7 +129,6 @@ def get_opened_positions(symbol):
 
 
 # Close all orders
-
 def check_and_close_orders(symbol):
     global isStop
     a = client.futures_get_open_orders(symbol=symbol)
@@ -140,9 +138,11 @@ def check_and_close_orders(symbol):
 
 
 def get_symbol_price(symbol):
-    prices = client.get_all_tickers()
+    #prices = client.get_all_tickers()
+    prices = client.futures_mark_price()
     df = pd.DataFrame(prices)
-    return float(df[df['symbol'] == symbol]['price'])
+    price=float(df[df['symbol'] == symbol]['markPrice'])
+    return price
 
 
 # INDICATORS
@@ -232,9 +232,9 @@ def check_if_signal(symbol):
     signal = ""  # return value
 
     i = 98  # 99 свеча не сформирована,берём 98 99 is current kandel which is not closed, 98 is last closed candel, we need 97 to check if it is bottom or top
-    x = 0.3 #близость прижатия к каналу средне 0.5
-    y = 5 #угол наклона-меньше для боковика средне 20
-    if isLCC(prepared_df, i - 1) > 0:  # i-1 берём 97-ю свечу
+    x = 0.4 #близость прижатия к каналу средне 0.5
+    y = 20 #угол наклона-меньше для боковика средне 20
+    if isLCC(prepared_df, i - 1) > 0:  # i-1 берём 97-ю свечу ======================================================================УГЛЫ====================
         # found bottom - OPEN LONG
         if prepared_df['position_in_channel'][i - 1] < x:  # локальный минимум
             # close to top of channel
@@ -258,6 +258,7 @@ telegram_delay = 12
 
 
 def getTPSLfrom_telegram():
+    global symbol
     strr = 'https://api.telegram.org/bot' + TOKEN + '/getUpdates'
     response = requests.get(strr)
     rs = response.json()
@@ -295,10 +296,13 @@ def getTPSLfrom_telegram():
 
 
 def telegram_bot_sendtext(bot_message):
-    bot_token2 = TOKEN
-    bot_chatID = CHAT
-    send_text = 'https://api.telegram.org/bot' + bot_token2 + '/sendMessage?chat_id=' + bot_chatID + '&parse_mode=Markdown&text=' + bot_message
-    response = requests.get(send_text)
+    try:
+        bot_token2 = TOKEN
+        bot_chatID = CHAT
+        send_text = 'https://api.telegram.org/bot' + bot_token2 + '/sendMessage?chat_id=' + bot_chatID + '&parse_mode=Markdown&text=' + bot_message
+        response = requests.get(send_text)
+    except:
+        time.sleep(30)
     return response.json()
 
 
@@ -326,15 +330,11 @@ def main(step):
         if open_sl == "":  # no position
             flag += 1
             flag2 = 0
-            print("Продолжаем работу " + time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time())))
-            print('Нет открытых позиций')
-            #print(get_opened_positions(symbol))
-            #print(balans)
-            #print(get_opened_positions(symbol)[4])
+            #print("Продолжаем работу " + time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time())))
+            #print('Нет открытых позиций')
             if flag == 1:
                 prt("Продолжаем работу " + time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time())))
                 prt('Нет открытых позиций')
-                #prt('БАЛАНС = ' + get_opened_positions(symbol)[4])
             # close all stop loss orders
             check_and_close_orders(symbol)
             signal = check_if_signal(symbol)
@@ -347,6 +347,12 @@ def main(step):
             elif signal == 'short':
                 open_position(symbol, 'short', maxposition)
                 new_balans = get_opened_positions(symbol)[4]
+            if new_balans != 0:
+                profit = new_balans - my_balans
+                prt(str(profit))
+                prt(str(new_balans))
+                profit = float(profit)
+                all_profit += profit
         else:
             flag = 0
             flag2 += 1
@@ -354,9 +360,9 @@ def main(step):
             entry_price = position[5]  # enter price
             current_price = get_symbol_price(symbol)
             quantity = position[1]
-            print("Продолжаем работу " + time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time())))
-            print('Найдена открытая позиция ' + open_sl + ' ' + symbol)
-            print('Кол-во: ' + str(quantity))
+            #print("Продолжаем работу " + time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time())))
+            # print('Найдена открытая позиция ' + open_sl + ' ' + symbol)
+            # print('Кол-во: ' + str(quantity))
             #print(get_opened_positions(symbol))
             if flag2 == 1:
                 prt("Продолжаем работу " + time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time())))
@@ -369,10 +375,8 @@ def main(step):
                 if current_price < stop_price:
                     # stop loss
                     close_position(symbol, 'long', abs(quantity))  # закрыть если цена достигла стоп-лосса
+                    prt('===STOP_LOSS===')
                     new_balans = get_opened_positions(symbol)[4]
-                    # profit = new_balans - my_balans
-                    # prt('STOP_LOSS')
-                    # prt(profit)
                     proffit_array = copy.copy(eth_proffit_array)
                 else:
                     temp_arr = copy.copy(proffit_array)
@@ -385,10 +389,6 @@ def main(step):
                             close_position(symbol, 'long',
                                            abs(round(maxposition * (contracts / 10), 3)))  # зарыть контракты из массива
                             new_balans = get_opened_positions(symbol)[4]
-                            # profit = new_balans - my_balans
-                            # #print(profit)
-                            # prt(profit)
-
                             del proffit_array[0]
 
             if open_sl == 'short':
@@ -396,11 +396,8 @@ def main(step):
                 if current_price > stop_price:
                     # stop loss
                     close_position(symbol, 'short', abs(quantity))
+                    prt('===STOP_LOSS===')
                     new_balans = get_opened_positions(symbol)[4]
-                    # profit = new_balans - my_balans
-                    # # print(profit)
-                    # prt('STOP_LOSS')
-                    # prt(profit)
                     proffit_array = copy.copy(eth_proffit_array)
                 else:
                     temp_arr = copy.copy(proffit_array)
@@ -412,9 +409,6 @@ def main(step):
                             # take profit
                             close_position(symbol, 'short', abs(round(maxposition * (contracts / 10), 3)))
                             new_balans = get_opened_positions(symbol)[4]
-                            # profit = new_balans - my_balans
-                            # #print(profit)
-                            # prt(profit)
                             del proffit_array[0]
             if new_balans != 0:
                 profit = new_balans - my_balans
@@ -430,18 +424,18 @@ def main(step):
 
 
 starttime = time.time()
-timeout = time.time() + 60 * 60 * 12  # 60 seconds times 60 meaning the script will run for 12 hr
+#timeout = time.time() + 60 * 60 * 12  # 60 seconds times 60 meaning the script will run for 12 hr
 counterr = 1
 if __name__ == '__main__':
-
     while True:  # time.time() <= timeout:
         try:
             # prt("script continue running at " + time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time())))
             main(counterr)
             if counterr > 5:
                 counterr = 1
-            time.sleep(1 - ((time.time() - starttime) % 1.0))  # время повторения запроса(10 секунд,можно минуту)
+            # time.sleep(1 - ((time.time() - starttime) % 1.0))  # время повторения запроса(10 секунд,можно минуту)
         except KeyboardInterrupt:
-            prt("script continue running at " + time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time())))
-            print('\n\KeyboardInterrupt. Stopping.')
-            exit()
+            prt("===что-то не так.подождём 30 секунд..=== " + time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time())))
+            time.sleep(30)
+            # print('\n\KeyboardInterrupt. Stopping.')
+            # exit()

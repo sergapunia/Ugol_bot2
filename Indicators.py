@@ -117,7 +117,7 @@ def getMaxMinChannel(DF, n):  # ыерхний и нижний уровень к
     return (maxx, minn)
 
 
-df = DataFrame(candals('ETHUSDT', '5m', 500)) #=============================================================
+df = DataFrame(candals('ETHUSDT', '15m', 500)) #=======================СВЕЧИ=====================================================================
 df = df[::-1]  # можно убрать
 prepared_df = PrepareDF(df)
 lend = len(prepared_df)
@@ -133,7 +133,7 @@ for i in range(4, lend - 1):
 
 position = 0
 deal = 0
-eth_proffit_array = [[20, 1], [40, 1], [60, 2], [80, 2], [100, 2], [150, 1], [200, 1],
+eth_proffit_array = [[3, 4], [6, 3.5], [8, 1.5], [12, 1], [100, 2], [150, 1], [200, 1],
                      [200, 0]]  # пункты и кол.контрактов по ним
 prepared_df['deal_o'] = [None] * lend
 prepared_df['deal_c'] = [None] * lend
@@ -182,30 +182,30 @@ for i in range(4, lend - 1):
 
     else:
         # try to find enter point
-        if prepared_df['lcc'][i - 1] != None:
+        if prepared_df['lcc'][i - 1] != None:#==========================УГЛЫ===========================================
             # found bottom - OPEN LONG
             if prepared_df['position_in_channel'][
-                i - 1] < 0.4:  # близость прижатия к каналу.можно поменять и сделать ближе(0.2)
+                i - 1] < 0.1:  # близость прижатия к каналу.можно поменять и сделать ближе(0.2)
                 # close to top of channel
-                if prepared_df['slope'][i - 1] < -10:  # уровень наклона -меньше для боковиков
+                if prepared_df['slope'][i - 1] < -12:  # уровень наклона -меньше для боковиков
                     # found a good enter point
                     if position == 0:
                         proffit_array = copy.copy(eth_proffit_array)
                         position = 10
                         open_price = prepared_df['close'][i]
-                        stop_price = prepared_df['close'][i] * 0.99  # стоп лосс на 1%,97-это 3%
+                        stop_price = prepared_df['close'][i] * 0.97  # стоп лосс на 1%,97-это 3%
                         prepared_df.at[i, 'deal_o'] = prepared_df['close'][i]
         if prepared_df['hcc'][i - 1] != None:
             # found top - OPEN SHORT
-            if prepared_df['position_in_channel'][i - 1] > 0.4:  # близость прижатия к каналу
+            if prepared_df['position_in_channel'][i - 1] > 0.1:  # близость прижатия к каналу
                 # close to top of channel
-                if prepared_df['slope'][i - 1] > 10:  # уровень наклона
+                if prepared_df['slope'][i - 1] > 12:  # уровень наклона
                     # found a good enter point
                     if position == 0:
                         proffit_array = copy.copy(eth_proffit_array)
                         position = -10
                         open_price = prepared_df['close'][i]
-                        stop_price = prepared_df['close'][i] * 1.01  # стоп лосс в 1% можно поменять,1.03- 3%
+                        stop_price = prepared_df['close'][i] * 1.02  # стоп лосс в 1% можно поменять,1.03- 3%
                         prepared_df.at[i, 'deal_o'] = prepared_df['close'][i]
 
 hours = round(lend * 5 / 60, 0)
@@ -249,4 +249,4 @@ def graphic():
     ax3.grid(True)
 
     plt.show()
-#print(graphic())
+print(graphic())
