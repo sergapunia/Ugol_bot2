@@ -5,14 +5,11 @@ import statsmodels.api as sm
 # import matplotlib.pyplot as plt
 import copy
 import time
-import random
 
-from binance import Client, ThreadedWebsocketManager, ThreadedDepthCacheManager
+# from binance import Client, ThreadedWebsocketManager, ThreadedDepthCacheManager
 from binance.client import Client
 
-#import unicorn_binance_websocket_api
-
-# from futures_sign import send_signed_request, send_public_request
+# import unicorn_binance_websocket_api
 
 TOKEN = '5653486266:AAEXoa-iM1pAY5N9eDEwbXJ6-aLGCyEgR5k'
 CHAT = '624736798'
@@ -20,15 +17,16 @@ CHAT = '624736798'
 KEY = '6ba95e7ed67fff7357a6a9fdca47e350852a2d62668d1db9570e5ae9db99e9c3'
 SECRET = '793aebcbcff748c0350cd24979964541e28cbe8491e2005853c52bec0cd4473f'
 
-symbol ='ETHUSDT'
+symbol = 'ETHUSDT'
 client = Client(KEY, SECRET, tld='https://testnet.binancefuture.com', testnet=True)
 
-#ubwa = unicorn_binance_websocket_api.BinanceWebSocketApiManager(exchange='binance.com')
-#ubwa.create_stream(['kline_4h'], 'ETHUSDT', output='UnicornFly')
+# ubwa = unicorn_binance_websocket_api.BinanceWebSocketApiManager(exchange='binance.com')
+# ubwa.create_stream(['kline_4h'], 'ETHUSDT', output='UnicornFly')
 
 maxposition = 1  # количество монет для торговли,учитывая плечи
-#stop_percent = 0.001  # 0.01=1% # процент потери для стопа торговли,учитывая плечи,с 40-м плечём 0.0002=примерно 1.2%
-eth_proffit_array =[[1.8, 5], [2.3, 2], [2.8, 2], [30, 1], [80, 2], [150, 1], [200, 1],[200, 0]]#[[0.9, 5], [1.5, 3.5], [2, 1.5], [3.5, 1], [80, 2], [150, 1], [200, 1],[200, 0]]   # массив контрактов.проходя пункты постепенно закрывает позицию
+# stop_percent = 0.001  # 0.01=1% # процент потери для стопа торговли,учитывая плечи,с 40-м плечём 0.0002=примерно 1.2%
+eth_proffit_array = [[1.8, 5], [2.3, 2], [2.8, 2], [30, 1], [80, 2], [150, 1], [200, 1], [200,
+                                                                                          0]]  # [[0.9, 5], [1.5, 3.5], [2, 1.5], [3.5, 1], [80, 2], [150, 1], [200, 1],[200, 0]]   # массив контрактов.проходя пункты постепенно закрывает позицию
 proffit_array = copy.copy(eth_proffit_array)
 
 pointer = str('=1=')  # при запуске бота с сервера и с пк,будет понятно где какой бот открывает сделки
@@ -37,7 +35,8 @@ pointer = str('=1=')  # при запуске бота с сервера и с �
 # Get last 500 kandels 5 minutes for Symbol
 
 def get_futures_klines(symbol, limit=500):
-    x = requests.get('https://binance.com/fapi/v1/klines?symbol=' + symbol + '&limit=' + str(limit) + '&interval=30m') #===================СВЕЧА=======================
+    x = requests.get('https://binance.com/fapi/v1/klines?symbol=' + symbol + '&limit=' + str(
+        limit) + '&interval=30m')  # ===================СВЕЧА=======================
     df = pd.DataFrame(x.json())
     df.columns = ['open_time', 'open', 'high', 'low', 'close', 'volume', 'close_time', 'd1', 'd2', 'd3', 'd4', 'd5']
     df = df.drop(['d1', 'd2', 'd3', 'd4', 'd5'], axis=1)
@@ -142,11 +141,10 @@ def check_and_close_orders(symbol):
 
 
 def get_symbol_price(symbol):
-    #prices = client.get_all_tickers()
+    # prices = client.get_all_tickers()
     prices = client.futures_mark_price()
     df = pd.DataFrame(prices)
-    price=float(df[df['symbol'] == symbol]['markPrice'])
-    return price
+    return float(df[df['symbol'] == symbol]['markPrice'])
 
 
 # INDICATORS
@@ -236,21 +234,22 @@ def check_if_signal(symbol):
     signal = ""  # return value
 
     i = 98  # 99 свеча не сформирована,берём 98 99 is current kandel which is not closed, 98 is last closed candel, we need 97 to check if it is bottom or top
-    x = 0.1 #близость прижатия к каналу средне 0.5
-    y = 2 #угол наклона-меньше для боковика средне 20
-    if isLCC(prepared_df, i - 1) > 0:  # i-1 берём 97-ю свечу ======================================================================УГЛЫ====================
+    # #близость прижатия к каналу средне 0.5
+    # угол наклона-меньше для боковика средне 20
+    if isLCC(prepared_df,
+             i - 1) > 0:  # i-1 берём 97-ю свечу ======================================================================УГЛЫ====================
         # found bottom - OPEN LONG
-        if prepared_df['position_in_channel'][i - 1] < x:  # локальный минимум
+        if prepared_df['position_in_channel'][i - 1] < 0.3:  # локальный минимум
             # close to top of channel
-            if prepared_df['slope'][i - 1] < (-y):  # если уровень достаточно низкий то в лонг
+            if prepared_df['slope'][i - 1] < -10:  # если уровень достаточно низкий то в лонг
                 # found a good enter point for LONG
                 signal = 'long'
 
     if isHCC(prepared_df, i - 1) > 0:  # локальный максимум
         # found top - OPEN SHORT
-        if prepared_df['position_in_channel'][i - 1] > x:
+        if prepared_df['position_in_channel'][i - 1] > 0.3:
             # close to top of channel
-            if prepared_df['slope'][i - 1] > y:  # если уровень достаточно высокий то в шорт
+            if prepared_df['slope'][i - 1] > 10:  # если уровень достаточно высокий то в шорт
                 # found a good enter point for SHORT
                 signal = 'short'
 
@@ -258,45 +257,45 @@ def check_if_signal(symbol):
 
 
 # tg bot
-telegram_delay = 12
+# telegram_delay = 12
 
 
-def getTPSLfrom_telegram():
-    global symbol
-    strr = 'https://api.telegram.org/bot' + TOKEN + '/getUpdates'
-    response = requests.get(strr)
-    rs = response.json()
-    if (len(rs['result']) > 0):
-        rs2 = rs['result'][-1]
-        rs3 = rs2['message']
-        textt = rs3['text']
-        datet = rs3['date']
-
-        if (time.time() - datet) < telegram_delay:
-            if 'btc' in textt:
-                symbol='BTCUSDT'
-            if 'eth' in textt:
-                symbol='ETHUSDT'
-            if 'xrp' in textt:
-                symbol='XRPUSDT'
-            if 'help' in textt:
-                telegram_bot_sendtext('quit - отключить бота   balans - баланс   all _ profit - общий профит с бота   hello - проверить бота   close _ pos - закрыть позиции   пары:btc,eth,xrp')
-            if 'quit' in textt:
-                quit()
-            if 'exit' in textt:
-                exit()
-            if 'balans' in textt:
-                telegram_bot_sendtext(str(get_opened_positions(symbol)[4]))
-            if 'all_profit' in textt:
-                telegram_bot_sendtext(all_profit)
-            if 'hello' in textt:
-                telegram_bot_sendtext('Всё ок,работаем')
-            if 'close_pos' in textt:
-                position = get_opened_positions(symbol)
-                open_sl = position[0]
-                quantity = position[1]
-                #  print(open_sl,quantity)
-                close_position(symbol, open_sl, abs(quantity))
+# def getTPSLfrom_telegram():
+#     global symbol
+#     strr = 'https://api.telegram.org/bot' + TOKEN + '/getUpdates'
+#     response = requests.get(strr)
+#     rs = response.json()
+#     if (len(rs['result']) > 0):
+#         rs2 = rs['result'][-1]
+#         rs3 = rs2['message']
+#         textt = rs3['text']
+#         datet = rs3['date']
+#
+#         if (time.time() - datet) < telegram_delay:
+#             if 'btc' in textt:
+#                 symbol='BTCUSDT'
+#             if 'eth' in textt:
+#                 symbol='ETHUSDT'
+#             if 'xrp' in textt:
+#                 symbol='XRPUSDT'
+#             if 'help' in textt:
+#                 telegram_bot_sendtext('quit - отключить бота   balans - баланс   all _ profit - общий профит с бота   hello - проверить бота   close _ pos - закрыть позиции   пары:btc,eth,xrp')
+#             if 'quit' in textt:
+#                 quit()
+#             if 'exit' in textt:
+#                 exit()
+#             if 'balans' in textt:
+#                 telegram_bot_sendtext(str(get_opened_positions(symbol)[4]))
+#             if 'all_profit' in textt:
+#                 telegram_bot_sendtext(all_profit)
+#             if 'hello' in textt:
+#                 telegram_bot_sendtext('Всё ок,работаем')
+#             if 'close_pos' in textt:
+#                 position = get_opened_positions(symbol)
+#                 open_sl = position[0]
+#                 quantity = position[1]
+#                 #  print(open_sl,quantity)
+#                 close_position(symbol, open_sl, abs(quantity))
 
 
 def telegram_bot_sendtext(bot_message):
@@ -306,7 +305,7 @@ def telegram_bot_sendtext(bot_message):
         send_text = 'https://api.telegram.org/bot' + bot_token2 + '/sendMessage?chat_id=' + bot_chatID + '&parse_mode=Markdown&text=' + bot_message
         response = requests.get(send_text)
     except:
-        time.sleep(30)
+        pass
     return response.json()
 
 
@@ -320,44 +319,42 @@ flag = 0
 flag2 = 0
 chek_flag = 0
 chek_flag2 = 0
-all_profit = 0
 chekpoint = get_opened_positions(symbol)[5]
 chekpoint2 = get_opened_positions(symbol)[5]
+
+
 def main(step):
     global chekpoint
     global chekpoint2
     global proffit_array
     global flag
     global flag2
-    global all_profit
     global chek_flag
     global chek_flag2
     new_balans = 0
-    my_balans=get_opened_positions(symbol)[4]
+    my_balans = get_opened_positions(symbol)[4]
     price = get_symbol_price(symbol)  # float(data['kline']['close_price'])
-    try:
-        #if chek_flag == 1:
-        if price > chekpoint:
-            chekpoint = price
-            TSL = chekpoint * 0.99 * 1.008  # 0.5% .с 10-м плечем это 5%/ 8- это 2% c 10-м плечём чем больше цифра тем ближе от цены
-            print('====LTSL = '+str(TSL))
-        #if chek_flag2 ==1:
-        if price < chekpoint2:
-            chekpoint2 = price
-            TSLh = chekpoint2 * 1.01 / 1.008  # 0.5% с 10-м плечем это 5% если 8 - это 2 % от цены с плечм 10, чем больше цифра тем ближе к цене
-            print('===HTSLh ='+ str(TSLh))
+    try:  # !!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        if chek_flag == 1:
+            if price > chekpoint:
+                chekpoint = price
+                TSL = chekpoint * 0.99 * 1.008  # 0.5% .с 10-м плечем это 5%/ 8- это 2% c 10-м плечём чем больше цифра тем ближе от цены
+                print('====LTSL = ' + str(TSL))
+        if chek_flag2 == 1:
+            if price < chekpoint2:
+                chekpoint2 = price
+                TSLh = chekpoint2 * 1.01 / 1.008  # 0.5% с 10-м плечем это 5% если 8 - это 2 % от цены с плечм 10, чем больше цифра тем ближе к цене
+                print('===HTSLh =' + str(TSLh))
     except:
         pass
     try:
         position = get_opened_positions(symbol)
         open_sl = position[0]
         if open_sl == "":  # no position
-            # chek_flag=0
-            # chek_flag2=0
+            chek_flag = 0  # !!!
+            chek_flag2 = 0  # !!!
             flag += 1
             flag2 = 0
-            #print("Продолжаем работу " + time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time())))
-            #print('Нет открытых позиций')
             if flag == 1:
                 prt("Продолжаем работу " + time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time())))
                 prt('Нет открытых позиций')
@@ -369,18 +366,12 @@ def main(step):
             if signal == 'long':  # открытие новой позиции
                 open_position(symbol, 'long', maxposition)
                 new_balans = get_opened_positions(symbol)[4]
-                #chek_flag = 1
+                chek_flag = 1
 
             elif signal == 'short':
                 open_position(symbol, 'short', maxposition)
                 new_balans = get_opened_positions(symbol)[4]
-                #chek_flag2 = 1
-            if new_balans != 0:
-                profit = new_balans - my_balans
-                prt(str(profit))
-                prt(str(new_balans))
-                #profit = float(profit)
-                #all_profit += profit
+                chek_flag2 = 1
         else:
             flag = 0
             flag2 += 1
@@ -388,20 +379,16 @@ def main(step):
             entry_price = position[5]  # enter price
             current_price = get_symbol_price(symbol)
             quantity = position[1]
-            #print("Продолжаем работу " + time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time())))
-            # print('Найдена открытая позиция ' + open_sl + ' ' + symbol)
-            # print('Кол-во: ' + str(quantity))
-            #print(get_opened_positions(symbol))
             if flag2 == 1:
                 prt("Продолжаем работу " + time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time())))
                 prt('Найдена открытая позиция ' + open_sl + ' ' + symbol)
                 prt('Кол-во: ' + str(quantity))
-                #prt('БАЛАНС =  '+balans)
+                # prt('БАЛАНС =  '+balans)
 
             if open_sl == 'long':
                 stop_price = TSL
-                #stop_price2 = entry_price * 0.99 * 1.008
-                if current_price < stop_price: #or current_price < stop_price2:
+                stop_price2 = entry_price * 0.99 * 1.008
+                if current_price < stop_price or current_price < stop_price2:
                     # stop loss
                     close_position(symbol, 'long', abs(quantity))  # закрыть если цена достигла стоп-лосса
                     prt('===STOP_LOSS===')
@@ -414,17 +401,17 @@ def main(step):
                         delta = temp_arr[j][0]
                         contracts = temp_arr[j][1]
                         if (current_price > (entry_price + delta)):
-                            flag =0
                             # take profit
                             close_position(symbol, 'long',
                                            abs(round(maxposition * (contracts / 10), 3)))  # зарыть контракты из массива
                             new_balans = get_opened_positions(symbol)[4]
+                            flag = 0
                             del proffit_array[0]
 
             if open_sl == 'short':
                 stop_price = TSLh
-                #stop_price2 = entry_price * 1.01 * 1.008
-                if current_price > stop_price: #or current_price > stop_price2:
+                stop_price2 = entry_price * 1.01 * 1.008
+                if current_price > stop_price or current_price > stop_price2:
                     # stop loss
                     close_position(symbol, 'short', abs(quantity))
                     prt('===STOP_LOSS===')
@@ -437,41 +424,34 @@ def main(step):
                         delta = temp_arr[j][0]
                         contracts = temp_arr[j][1]
                         if (current_price < (entry_price - delta)):
-                            flag =0
                             # take profit
                             close_position(symbol, 'short', abs(round(maxposition * (contracts / 10), 3)))
                             new_balans = get_opened_positions(symbol)[4]
+                            flag = 0
                             del proffit_array[0]
-            if new_balans != 0:
-                profit = new_balans - my_balans
-                prt(str(profit))
-                prt(str(new_balans))
-                # profit = float(profit)
-                # all_profit += profit
-
-
+        if new_balans != 0:
+            profit = new_balans - my_balans
+            prt(str(profit))
+            prt(str(new_balans))
     except:
         prt(time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time())))
         prt('\n\nНичего не происходит')
 
 
 starttime = time.time()
-#timeout = time.time() + 60 * 60 * 12  # 60 seconds times 60 meaning the script will run for 12 hr
+# timeout = time.time() + 60 * 60 * 12  # 60 seconds times 60 meaning the script will run for 12 hr
 counterr = 1
 if __name__ == '__main__':
-    try:
-        while True:  # time.time() <= timeout:
-            try:
-                # prt("script continue running at " + time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time())))
-                main(counterr)
-                if counterr > 5:
-                    counterr = 1
-                # time.sleep(1 - ((time.time() - starttime) % 1.0))  # время повторения запроса(10 секунд,можно минуту)
-            except KeyboardInterrupt:
-                prt("===что-то не так.подождём 30 секунд..=== " + time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time())))
-                time.sleep(30)
-                # print('\n\KeyboardInterrupt. Stopping.')
-                # exit()
-    except:
-        exit()
-        prt('============Бот Отключен=============')
+    while True:  # time.time() <= timeout:
+        try:
+            # prt("script continue running at " + time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time())))
+            main(counterr)
+            counterr = counterr + 1
+            if counterr > 5:
+                counterr = 1
+            time.sleep(1 - ((time.time() - starttime) % 1.0))  # время повторения запроса(10 секунд,можно минуту)
+        except KeyboardInterrupt:
+            prt("===что-то не так.подождём 30 секунд..=== " + time.strftime('%Y-%m-%d %H:%M:%S',
+                                                                            time.localtime(time.time())))
+            # print('\n\KeyboardInterrupt. Stopping.')
+            exit()
