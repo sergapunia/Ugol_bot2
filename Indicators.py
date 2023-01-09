@@ -249,4 +249,4 @@ def graphic():
     ax3.grid(True)
 
     plt.show()
-#print(graphic())
+print(graphic())

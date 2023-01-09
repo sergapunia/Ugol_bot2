@@ -1,16 +1,12 @@
 import requests
 import numpy as np
 import pandas as pd
-import statsmodels.api as sm
 import matplotlib.pyplot as plt
+import statsmodels.api as sm
 import copy
 import time
-import random
-
-from binance.enums import *
-import math
+from Graphic import graphik
 from binance import Client, ThreadedWebsocketManager, ThreadedDepthCacheManager
-from futures_sign import send_signed_request, send_public_request
 
 pd.set_option('display.max_columns', 500) #приводим в порядок отображение колонок 1-отобразить все колонки
 pd.set_option('display.max_rows', 500) #2 - ряды
@@ -22,7 +18,7 @@ CHAT = '624736798'
 KEY = '6ba95e7ed67fff7357a6a9fdca47e350852a2d62668d1db9570e5ae9db99e9c3'
 SECRET = '793aebcbcff748c0350cd24979964541e28cbe8491e2005853c52bec0cd4473f'
 
-symbol = 'XRPUSDT'
+symbol = 'ETHUSDT'
 client = Client(KEY, SECRET, tld='https://testnet.binancefuture.com', testnet=True)
 
 # ubwa = unicorn_binance_websocket_api.BinanceWebSocketApiManager(exchange='binance.com')
@@ -156,116 +152,6 @@ def get_symbol_price(symbol):
     prices = client.futures_mark_price()
     df = pd.DataFrame(prices)
     return float(df[df['symbol'] == symbol]['markPrice'])
-
-
-# INDICATORS
-# To find a slope of price line
-# def indSlope(series, n):  # определяет угол наклона
-#     array_sl = [j * 0 for j in range(n - 1)]
-#
-#     for j in range(n, len(series) + 1):
-#         y = series[j - n:j]
-#         x = np.array(range(n))
-#         x_sc = (x - x.min()) / (x.max() - x.min())
-#         y_sc = (y - y.min()) / (y.max() - y.min())
-#         x_sc = sm.add_constant(x_sc)
-#         model = sm.OLS(y_sc, x_sc)
-#         results = model.fit()
-#         array_sl.append(results.params[-1])
-#     slope_angle = (np.rad2deg(np.arctan(np.array(array_sl))))
-#     return np.array(slope_angle)
-#
-#
-# # True Range and Average True Range indicator
-#
-# def indATR(source_DF, n):  # истинный дневной диапазон
-#     df = source_DF.copy()
-#     df['H-L'] = abs(df['high'] - df['low'])
-#     df['H-PC'] = abs(df['high'] - df['close'].shift(1))
-#     df['L-PC'] = abs(df['low'] - df['close'].shift(1))
-#     df['TR'] = df[['H-L', 'H-PC', 'L-PC']].max(axis=1, skipna=False)
-#     df['ATR'] = df['TR'].rolling(n).mean()
-#     df_temp = df.drop(['H-L', 'H-PC', 'L-PC'], axis=1)
-#     return df_temp
-#
-#
-# # find local mimimum / local maximum
-#
-# def isLCC(DF, i):
-#     df = DF.copy()
-#     LCC = 0
-#
-#     if df['close'][i] <= df['close'][i + 1] and df['close'][i] <= df['close'][i - 1] and df['close'][i + 1] > \
-#             df['close'][i - 1]:
-#         # найдено Дно
-#         LCC = i - 1;
-#     return LCC
-#
-#
-# def isHCC(DF, i):
-#     df = DF.copy()
-#     HCC = 0
-#     if df['close'][i] >= df['close'][i + 1] and df['close'][i] >= df['close'][i - 1] and df['close'][i + 1] < \
-#             df['close'][i - 1]:
-#         # найдена вершина
-#         HCC = i;
-#     return HCC
-#
-#
-# def getMaxMinChannel(DF, n):  # верхний и нижний уровень канала
-#     maxx = 0
-#     minn = DF['low'].max()
-#     for i in range(1, n):
-#         if maxx < DF['high'][len(DF) - i]:
-#             maxx = DF['high'][len(DF) - i]
-#         if minn > DF['low'][len(DF) - i]:
-#             minn = DF['low'][len(DF) - i]
-#     return (maxx, minn)
-#
-#
-# # generate data frame with all needed data
-#
-# def PrepareDF(DF):
-#     ohlc = DF.iloc[:, [0, 1, 2, 3, 4, 5]]
-#     ohlc.columns = ["date", "open", "high", "low", "close", "volume"]
-#     ohlc = ohlc.set_index('date')
-#     df = indATR(ohlc, 14).reset_index()
-#     df['slope'] = indSlope(df['close'], 5)
-#     df['channel_max'] = df['high'].rolling(10).max()
-#     df['channel_min'] = df['low'].rolling(10).min()
-#     df['position_in_channel'] = (df['close'] - df['channel_min']) / (df['channel_max'] - df['channel_min'])
-#     df = df.set_index('date')
-#     df = df.reset_index()
-#     return (df)
-#
-#
-# def check_if_signal(symbol):
-#     ohlc = get_futures_klines(symbol, 100)  # берём 100 последних свечей
-#     prepared_df = PrepareDF(ohlc)
-#     signal = ""  # return value
-#
-#     i = 98  # 99 свеча не сформирована,берём 98 99 is current kandel which is not closed, 98 is last closed candel, we need 97 to check if it is bottom or top
-#     # #близость прижатия к каналу средне 0.5
-#     # угол наклона-меньше для боковика средне 20
-#     if isLCC(prepared_df,
-#              i - 1) > 0:  # i-1 берём 97-ю свечу ======================================================================УГЛЫ====================
-#         # found bottom - OPEN LONG
-#         if prepared_df['position_in_channel'][i - 1] < 0.3:  # локальный минимум
-#             # close to top of channel
-#             if prepared_df['slope'][i - 1] < -6:  # если уровень достаточно низкий то в лонг
-#                 # found a good enter point for LONG
-#                 signal = 'long'
-#
-#     if isHCC(prepared_df, i - 1) > 0:  # локальный максимум
-#         # found top - OPEN SHORT
-#         if prepared_df['position_in_channel'][i - 1] > 0.3:
-#             # close to top of channel
-#             if prepared_df['slope'][i - 1] > 6:  # если уровень достаточно высокий то в шорт
-#                 # found a good enter point for SHORT
-#                 signal = 'short'
-#
-#     return signal
-
 #=================================================================================
 def indSlope(series, n):
     array_sl = [j * 0 for j in range(n - 1)]
@@ -399,6 +285,8 @@ def getTPSLfrom_telegram():
                     price = get_symbol_price(symbol)  # float(data['kline']['close_price'])
                     procent = round(((get_opened_positions(symbol)[5] / price) * 100) - 100, 2)
                     telegram_bot_sendtext(str(procent) + ('%'))
+                if 'graphic' in textt:
+                    graphik(symbol)
                 if 'price' in textt:
                     telegram_bot_sendtext(symbol+' = '+str(get_symbol_price(symbol)))
                 if 'help' in textt:
@@ -426,6 +314,79 @@ def telegram_bot_sendtext(bot_message):
     response = requests.get(send_text)
     return response.json()
 
+def graphik(symbol=symbol):
+    df = get_futures_klines(symbol=symbol, limit=50)
+    global chekpoint
+    global chekpoint2
+
+    up = df[df. close >=df. open ]
+    down = df[df. close <df. open ]
+
+    width = .4 #.4 стандарт.-ширина свечей
+    width2 = .05 #.05 -вторая ширина
+
+    col1 = 'green'
+    col2 = 'red'
+    fig, ax = plt.subplots(facecolor='grey',edgecolor='black')
+    ax.set_facecolor('black')
+    ax.set_xlim(0,55)
+    #время
+    a = time.ctime()
+    a = a.split()
+    times = a[3][0:5]
+    #график пунктиром
+    plt.plot(df.index, df.close, color='white', alpha=0.6, linestyle='-.')
+    #свечи вверх
+    plt.bar (up. index ,up. close -up. open ,width,bottom=up. open ,color=col1)
+    plt.bar (up. index ,up. high -up. close ,width2,bottom=up. close ,color=col1)
+    plt.bar (up. index ,up. low -up. open ,width2,bottom=up. open ,color=col1)
+    #свечи вниз
+    plt.bar (down. index ,down. close -down. open ,width,bottom=down. open ,color=col2)
+    plt.bar (down. index ,down. high -down. open ,width2,bottom=down. open ,color=col2)
+    plt.bar (down. index ,down. low -down. close ,width2,bottom=down. close ,color=col2)
+    plt.grid(color='turquoise',linewidth=0.2,linestyle='--')
+    prices = client.futures_mark_price()
+    df = pd.DataFrame(prices)
+    price=float(df[df['symbol'] == symbol]['markPrice'])
+
+    ax.set_title(f'{symbol}   {times}',fontsize=20,color='blue')
+    #линия цены
+    x = [0, 55]
+    y = [price, price]
+    plt.plot(x,y,label=f'Price {price}',color='white',linestyle='--',marker='',linewidth=0.5)
+    #линии стоп лосса
+    flag_graph=0
+    if get_opened_positions(symbol)[0]=='long':
+        if flag_graph==0:
+            stoploss= price * 0.99 * 1.008
+            x1=[0,55]
+            y1=[stoploss,stoploss]
+            plt.plot(label=f'STOP_start {stoploss}',color='red',linestyle='--',marker='',linewidth=1)
+        if price > chekpoint:
+            flag_graph=1
+            chekpoint = price
+            TSL = chekpoint * 0.99 * 1.008  # 0.5% .с 10-м плечем это 5%/ 8- это 2% c 10-м плечём чем больше цифра тем ближе от цены
+            stop_priceg = TSL
+            t1=[0,55]
+            t2=[stop_priceg,stop_priceg]
+            plt.plot(label=f'TSL-L {stop_priceg}', color='pink', linestyle='-.', marker='', linewidth=0.8)
+
+    entryprice = get_opened_positions(symbol)[5]
+    x2 = [0, 55]
+    y2 = [entryprice, entryprice]
+    #наклон галочек
+    plt.xticks (np.arange(0,55,5),rotation= 45 , ha='right')
+    plt.legend(loc='best')
+
+    fig.savefig(f'C:/Users/Admin/Desktop/talib./graph')
+
+    # отправка фото
+    url = 'https://api.telegram.org/bot' + TOKEN + '/sendPhoto';
+    files = {'photo': open(r"C:\Users\Admin\Desktop\talib\graph.png", 'rb')}
+    data = {'chat_id': "624736798"}
+    r = requests.post(url, files=files, data=data)
+    return r.json()
+
 
 def prt(message):
     # для телеграмма
@@ -452,6 +413,7 @@ def main(step):
     price = get_symbol_price(symbol)  # float(data['kline']['close_price'])
     procent=round(((get_opened_positions(symbol)[5] / price)*100)-100,2)
     print(str(procent)+('%'))
+    print(get_opened_positions(symbol)[5])
     try:
         position = get_opened_positions(symbol)
         open_sl = position[0]
