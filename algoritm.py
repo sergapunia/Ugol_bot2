@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import statsmodels.api as sm
 import copy
 import time
-from Graphic import graphik
+# from Graphic import graphik
 from binance import Client, ThreadedWebsocketManager, ThreadedDepthCacheManager
 
 pd.set_option('display.max_columns', 500) #приводим в порядок отображение колонок 1-отобразить все колонки
@@ -15,6 +15,7 @@ pd.set_option('display.width', 1000) # 3-ширина
 TOKEN = '5653486266:AAEXoa-iM1pAY5N9eDEwbXJ6-aLGCyEgR5k'
 CHAT = '624736798'
 
+
 KEY = '6ba95e7ed67fff7357a6a9fdca47e350852a2d62668d1db9570e5ae9db99e9c3'
 SECRET = '793aebcbcff748c0350cd24979964541e28cbe8491e2005853c52bec0cd4473f'
 
@@ -23,19 +24,18 @@ client = Client(KEY, SECRET, tld='https://testnet.binancefuture.com', testnet=Tr
 
 # ubwa = unicorn_binance_websocket_api.BinanceWebSocketApiManager(exchange='binance.com')
 # ubwa.create_stream(['kline_4h'], 'ETHUSDT', output='UnicornFly')
-symbol_info = client.get_symbol_info(symbol)
-min_q = symbol_info['filters'][0]['minPrice']  # минимальное количество закупки.нет-ошибка
-maxposition = 300  # минимальное количество закупки.
 
 # stop_percent = 0.001  # 0.01=1% # процент потери для стопа торговли,учитывая плечи,с 40-м плечём 0.0002=примерно 1.2%
-eth_proffit_array = [[1.8, 5], [2.3, 2], [2.8, 2], [30, 1], [80, 2], [150, 1], [200, 1], [200,
-                                                                                          0]]  # [[0.9, 5], [1.5, 3.5], [2, 1.5], [3.5, 1], [80, 2], [150, 1], [200, 1],[200, 0]]   # массив контрактов.проходя пункты постепенно закрывает позицию
+
+eth_proffit_array = [[1.004, 5], [1.007, 3], [1.01, 2], [1.04, 1], [80, 2], [150, 1], [200, 1], [200,
+                                                                                          0]]  # массив контрактов.проходя пункты постепенно закрывает позицию
 proffit_array = copy.copy(eth_proffit_array)
 
 pointer = str('')  # при запуске бота с сервера и с пк,будет понятно где какой бот открывает сделки
 
 
 # Get last 500 kandels 5 minutes for Symbol
+
 
 def get_futures_klines(symbol, limit=500):
     x = requests.get('https://binance.com/fapi/v1/klines?symbol=' + symbol + '&limit=' + str(
@@ -290,7 +290,7 @@ def getTPSLfrom_telegram():
                 if 'price' in textt:
                     telegram_bot_sendtext(symbol+' = '+str(get_symbol_price(symbol)))
                 if 'help' in textt:
-                    telegram_bot_sendtext('procent - процент профита позиции   quit - отключить бота   balans - баланс   hello - проверить бота   close _ pos - закрыть позиции  price - прайс символа')
+                    telegram_bot_sendtext('graphic - график  procent - процент профита позиции   quit - отключить бота   balans - баланс   hello - проверить бота   close _ pos - закрыть позиции  price - прайс символа')
                 if 'quit' in textt:
                     quit()
                 if 'exit' in textt:
@@ -305,6 +305,7 @@ def getTPSLfrom_telegram():
                     quantity = position[1]
                     #  print(open_sl,quantity)
                     close_position(symbol, open_sl, abs(quantity))
+                    telegram_bot_sendtext('Позиция закрыта')
 
 
 def telegram_bot_sendtext(bot_message):
@@ -314,11 +315,13 @@ def telegram_bot_sendtext(bot_message):
     response = requests.get(send_text)
     return response.json()
 
+
+flag_graph=0
 def graphik(symbol=symbol):
     df = get_futures_klines(symbol=symbol, limit=50)
-    global chekpoint
-    global chekpoint2
-
+    global flag_graph
+    global flag_graphH
+    global flag_graphL
     up = df[df. close >=df. open ]
     down = df[df. close <df. open ]
 
@@ -353,36 +356,78 @@ def graphik(symbol=symbol):
     #линия цены
     x = [0, 55]
     y = [price, price]
-    plt.plot(x,y,label=f'Price {price}',color='white',linestyle='--',marker='',linewidth=0.5)
+    plt.plot(x,y,label=f'Pr {round(price,4)}',color='white',linestyle='--',marker='',linewidth=0.5)
     #линии стоп лосса
-    flag_graph=0
-    if get_opened_positions(symbol)[0]=='long':
-        if flag_graph==0:
-            stoploss= price * 0.99 * 1.008
-            x1=[0,55]
-            y1=[stoploss,stoploss]
-            plt.plot(label=f'STOP_start {stoploss}',color='red',linestyle='--',marker='',linewidth=1)
-        if price > chekpoint:
-            flag_graph=1
-            chekpoint = price
-            TSL = chekpoint * 0.99 * 1.008  # 0.5% .с 10-м плечем это 5%/ 8- это 2% c 10-м плечём чем больше цифра тем ближе от цены
-            stop_priceg = TSL
-            t1=[0,55]
-            t2=[stop_priceg,stop_priceg]
-            plt.plot(label=f'TSL-L {stop_priceg}', color='pink', linestyle='-.', marker='', linewidth=0.8)
-
     entryprice = get_opened_positions(symbol)[5]
-    x2 = [0, 55]
-    y2 = [entryprice, entryprice]
+    pos=get_opened_positions(symbol)[0]
+    if pos == '':
+        flag_graph=0
+        flag_graphL=0
+        flag_graphH=0
+    if pos == 'long':
+        if flag_graph==0:
+            stoploss = entryprice * 0.99 * 1.006
+            x1 = [0, 55]
+            y1 = [stoploss, stoploss]
+            plt.plot(x1,y1,label=f'st {round(stoploss,4)} -0.4%',color='red',linestyle='--',marker='',linewidth=1)
+        if flag_graphL!=0:
+            flag_graph=1
+            t1 = [0, 55]
+            t2 = [flag_graphL, flag_graphL]
+            plt.plot(t1,t2,label=f'ST-L {round(flag_graphL,4)}', color='pink', linestyle='-.', marker='', linewidth=0.8)
+
+        x2 = [0, 55]
+        y2 = [entryprice, entryprice]
+        plt.plot(x2, y2, label=f'long {round(entryprice,4)}', color='green', linestyle='--', marker='', linewidth=1.5)
+        p1=entryprice*1.004
+        p2=entryprice*1.007
+        p3=entryprice*1.01
+        xx1=[0,55]
+        yy1=[p1,p1]
+        plt.plot(xx1, yy1, label=f'p1 {round(p1,4)} 0.4%-0.5', color='#74F827', linestyle='--', marker='',alpha=0.8, linewidth=0.8)
+        xx2 = [0, 55]
+        yy2 = [p2, p2]
+        plt.plot(xx2, yy2, label=f'p2 {round(p2,4)} 0.7%-0.3', color='#74F827', linestyle='--', marker='', alpha=0.8, linewidth=0.8)
+        xx3 = [0, 55]
+        yy3 = [p3, p3]
+        plt.plot(xx3, yy3, label=f'p3 {round(p3,4)} 1%-0.2', color='#74F827', linestyle='--', marker='', alpha=0.8, linewidth=0.8)
+    if pos == 'short':
+        if flag_graph==0:
+            stoploss2 = entryprice * 1.004
+            x11 = [0, 55]
+            y11 = [stoploss2, stoploss2]
+            plt.plot(x11,y11,label=f'st {round(stoploss2,4)} -0.4%',color='red',linestyle='--',marker='',linewidth=1)
+        if flag_graphH!=0:
+            flag_graph=1
+            t11 = [0, 55]
+            t22 = [flag_graphH, flag_graphH]
+            plt.plot(t11,t22,label=f'ST-L {round(flag_graphH,4)}', color='pink', linestyle='-.', marker='', linewidth=0.8)
+
+        x22 = [0, 55]
+        y22 = [entryprice, entryprice]
+        plt.plot(x22, y22, label=f'short {round(entryprice,4)}', color='#F80063', linestyle='--', marker='', linewidth=1.5)
+        p11=entryprice/1.004
+        p22=entryprice/1.007
+        p33=entryprice/1.01
+        xx11=[0,55]
+        yy11=[p11,p11]
+        plt.plot(xx11, yy11, label=f'p1 {round(p11,4)} 0.4%-0.5', color='#F84E4E', linestyle='--', marker='',alpha=0.8, linewidth=0.8)
+        xx22 = [0, 55]
+        yy22 = [p22, p22]
+        plt.plot(xx22, yy22, label=f'p2 {round(p22,4)} 0.7%-0.3', color='#F84E4E', linestyle='--', marker='', alpha=0.8, linewidth=0.8)
+        xx33 = [0, 55]
+        yy33 = [p33, p33]
+        plt.plot(xx33, yy33, label=f'p3 {round(p33,4)} 1%-0.2', color='#F84E4E', linestyle='--', marker='', alpha=0.8, linewidth=0.8)
+
     #наклон галочек
-    plt.xticks (np.arange(0,55,5),rotation= 45 , ha='right')
+    plt.xticks (np.arange(0,55,5),rotation= 15 , ha='right')
     plt.legend(loc='best')
 
-    fig.savefig(f'C:/Users/Admin/Desktop/talib./graph')
+    fig.savefig(f'C:/Users/Admin/Desktop/Ugol_bot./graph')
 
     # отправка фото
     url = 'https://api.telegram.org/bot' + TOKEN + '/sendPhoto';
-    files = {'photo': open(r"C:\Users\Admin\Desktop\talib\graph.png", 'rb')}
+    files = {'photo': open(r"C:\Users\Admin\Desktop\Ugol_bot\graph.png", 'rb')}
     data = {'chat_id': "624736798"}
     r = requests.post(url, files=files, data=data)
     return r.json()
@@ -393,12 +438,16 @@ def prt(message):
     telegram_bot_sendtext(pointer + ': ' + message)
     print(pointer + ': ' + message)
 
-
+flag_graphL=0
+flag_graphH=0
 flag = 0
 flag2 = 0
 chekpoint = get_opened_positions(symbol)[5]
 chekpoint2 = get_opened_positions(symbol)[5]
 
+pr=get_symbol_price(symbol)
+usd=12
+maxposition=usd/pr
 
 def main(step):
     getTPSLfrom_telegram()
@@ -408,6 +457,8 @@ def main(step):
     global flag
     global flag2
     global maxposition
+    global flag_graphL
+    global flag_graphH
     new_balans = 0
     my_balans = get_opened_positions(symbol)[4]
     price = get_symbol_price(symbol)  # float(data['kline']['close_price'])
@@ -418,6 +469,7 @@ def main(step):
         position = get_opened_positions(symbol)
         open_sl = position[0]
         print(open_sl)
+
         # if open_sl == 'long':
         #     if price > chekpoint:
         #         chekpoint = price
@@ -445,6 +497,7 @@ def main(step):
 
             if signal == 'long':  # открытие новой позиции
                 open_position(symbol, 'long', maxposition)
+                graphik(symbol)
                 new_balans = get_opened_positions(symbol)[4]
                 if new_balans != 0:
                     profit = new_balans - my_balans
@@ -453,6 +506,7 @@ def main(step):
 
             elif signal == 'short':
                 open_position(symbol, 'short', maxposition)
+                graphik(symbol)
                 new_balans = get_opened_positions(symbol)[4]
                 if new_balans != 0:
                     profit = new_balans - my_balans
@@ -478,22 +532,24 @@ def main(step):
                 try:
                     if price > chekpoint:
                         chekpoint = price
-                        TSL = chekpoint * 0.99 * 1.008  # 0.5% .с 10-м плечем это 5%/ 8- это 2% c 10-м плечём чем больше цифра тем ближе от цены
+                        TSL = chekpoint * 0.99 * 1.006  # 0.98*1.005 - 1.5%<0.99*1.006-0.4 или 4% для 10Х
                         stop_price = TSL
+                        flag_graphL=stop_price
+                        prt(str(procent) + ('%'))
                         # print('----NEW====L-SL = ' + str(TSL))
                         # print('Price: '+price)
                 except:
                     pass
                 prt('====L-SL = ' + str(TSL))
-                prt(get_symbol_price(symbol))
+                prt(str(price))
                 #prt('====PRICE = '+price)
                 # stop_price = TSL
                 # stop_price2 = entry_price * 0.99 * 1.008
                 current_price = get_symbol_price(symbol)
                 stop_price = TSL
-                print('STOP_PRICE = '+stop_price)
-                stop_price2 = entry_price * 0.99 * 1.008
-                print('STANDART_STOP = '+stop_price2)
+                #print('STOP_PRICE = '+stop_price)
+                stop_price2 = entry_price * 0.99 * 1.006
+                #print('STANDART_STOP = '+stop_price2)
                 if current_price <= stop_price or current_price <= stop_price2:
                     # stop loss
                     close_position(symbol, 'long', abs(quantity))  # закрыть если цена достигла стоп-лосса
@@ -510,11 +566,12 @@ def main(step):
                     for j in range(0, len(temp_arr) - 1):
                         delta = temp_arr[j][0]
                         contracts = temp_arr[j][1]
-                        if (current_price > (entry_price + delta)):
+                        if (current_price > (entry_price * delta)):
                             # take profit
                             close_position(symbol, 'long',
                                            abs(round(maxposition * (contracts / 10), 3)))  # зарыть контракты из массива
                             prt('ЗАКРЫЛ ЧАСТЬ ПОЗИЦИИ')
+                            graphik(symbol)
                             new_balans = get_opened_positions(symbol)[4]
                             flag = 0
                             del proffit_array[0]
@@ -527,8 +584,10 @@ def main(step):
             if open_sl == 'short':
                 if price < chekpoint2:
                     chekpoint2 = price
-                    TSLh = chekpoint2 * 1.01 / 1.008  # 0.5% с 10-м плечем это 5% если 8 - это 2 % от цены с плечм 10, чем больше цифра тем ближе к цене
+                    TSLh = chekpoint2 * 1.004  # 1.015- 1.5% #1.004 - 4% для 10Х
                     stop_price3 = TSLh
+                    flag_graphH = stop_price3
+                    prt(str(procent) + ('%'))
                     # print('----NEW===H-SL =' + str(TSLh))
                     # print('Price: '+price)
                 prt('===H-SL =' + str(TSLh))
@@ -539,7 +598,7 @@ def main(step):
                 current_price = get_symbol_price(symbol)
                 stop_price3 = TSLh
                 print('STOP_PRICE = ' + stop_price3)
-                stop_price4 = entry_price * 1.01 * 1.008
+                stop_price4 = entry_price * 1.004
                 print('STANDART_STOP_PRICE = '+stop_price4)
                 if current_price > stop_price3 or current_price > stop_price2:
                     # stop loss
@@ -557,10 +616,11 @@ def main(step):
                     for j in range(0, len(temp_arr) - 1):
                         delta = temp_arr[j][0]
                         contracts = temp_arr[j][1]
-                        if (current_price < (entry_price - delta)):
+                        if (current_price < (entry_price / delta)):
                             # take profit
                             close_position(symbol, 'short', abs(round(maxposition * (contracts / 10), 3)))
                             prt('ЗАКРЫЛ ЧАСТЬ ПОЗИЦИИ')
+                            graphik(symbol)
                             new_balans = get_opened_positions(symbol)[4]
                             flag = 0
                             del proffit_array[0]
@@ -568,6 +628,7 @@ def main(step):
                                 profit = new_balans - my_balans
                                 prt(str(profit))
                                 prt(str(new_balans))
+
         # prt('===H-SL =' + str(TSLh))
         # prt('====L-SL = ' + str(TSL))
         # prt('====PRICE = ' + price)
@@ -580,10 +641,15 @@ def main(step):
         print('\n\nНичего не происходит')
 
 
+
+
+
+
 starttime = time.time()
 # timeout = time.time() + 60 * 60 * 12  # 60 seconds times 60 meaning the script will run for 12 hr
 counterr = 1
 if __name__ == '__main__':
+    print(maxposition)
     while True:  # time.time() <= timeout:
         print(get_symbol_price(symbol))
         try:
